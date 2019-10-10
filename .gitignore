@@ -1,3 +1,13 @@
+# dataset
+VOCdevkit Testing/
+VOCdevkit Training/
+
+# pycharm files
+.idea/
+
+long_shelhamer_fcn.pdf
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
