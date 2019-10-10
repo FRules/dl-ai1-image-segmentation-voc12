@@ -59,7 +59,7 @@ def train(epochs, batch_size, n_classes, input_height, input_width):
                                   validation_data=val_generator,
                                   validation_steps=(no_of_val_images // batch_size),
                                   verbose=2)
-    mo.save(model, "custom_model_regularized")
+    mo.save(model, "custom_model_regularized_2")
     plot_history(history)
 
 
