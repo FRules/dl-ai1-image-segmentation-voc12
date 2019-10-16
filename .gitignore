@@ -7,6 +7,9 @@ VOCdevkit Training/
 
 long_shelhamer_fcn.pdf
 
+custom_models_results/*.h5
+custom_models_results/*.json
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
