@@ -1,6 +1,7 @@
 import image_preprocessing
 import custom_model as mo
 import matplotlib
+from predefined_models import vgg16
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
@@ -52,16 +53,20 @@ def train(epochs, batch_size, n_classes, input_height, input_width):
     print("Number of training images:", no_of_training_images)
     print("Number of validation images:", no_of_val_images)
 
-    model = mo.custom_model_regularized_2(n_classes=n_classes, input_height=input_height, input_width=input_width)
+    #model = mo.custom_model_regularized_2_more_filters_2(
+    #    n_classes=n_classes, input_height=input_height, input_width=input_width)
+
+    model = vgg16.vgg16_model(
+        n_classes=n_classes, input_height=input_height, input_width=input_width, weights="vgg/vgg16_weights.h5")
 
     history = model.fit_generator(generator=train_generator, epochs=epochs,
                                   steps_per_epoch=(no_of_training_images // batch_size),
                                   validation_data=val_generator,
                                   validation_steps=(no_of_val_images // batch_size),
                                   verbose=2)
-    mo.save(model, "custom_model_regularized_2")
+    mo.save(model, "vgg16_pretrained_encoder")
     plot_history(history)
 
 
 if __name__ == "__main__":
-    train(epochs=100, batch_size=16, n_classes=22, input_height=224, input_width=224)
+    train(epochs=30, batch_size=16, n_classes=22, input_height=224, input_width=224)

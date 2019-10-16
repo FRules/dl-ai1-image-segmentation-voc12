@@ -1,8 +1,10 @@
+from keras.models import *
 from keras.layers import *
-from keras import Model
-from keras.optimizers import *
 
-def vgg16_model(n_classes, input_height=224, input_width=224, weights=None):
+VGG_Weights_path = "vgg16_weights.h5"
+
+
+def get_model(n_classes, input_height=224, input_width=224):
     # input_height and width must be dividable by 32 because maxpooling
     # with filter size = (2,2) is operated 5 times,
     # which makes the input_height and width 2^5 = 32 times smaller
@@ -45,39 +47,30 @@ def vgg16_model(n_classes, input_height=224, input_width=224, weights=None):
         x)
 
     vgg = Model(img_input, pool5)
-    if weights is not None:
-        vgg.load_weights(weights)  # loading VGG weights for the encoder parts of FCN8
+    vgg.load_weights(VGG_Weights_path)  # loading VGG weights for the encoder parts of FCN8
 
-    o = (Conv2D(4096, (7, 7), activation='relu', padding='same', name="conv6", data_format=IMAGE_ORDERING))(pool5)
-    conv7 = (Conv2D(4096, (1, 1), activation='relu', padding='same', name="conv7", data_format=IMAGE_ORDERING))(o)
+    n = 4096
+    o = (Conv2D(n, (7, 7), activation='relu', padding='same', name="conv6", data_format=IMAGE_ORDERING))(pool5)
+    conv7 = (Conv2D(n, (1, 1), activation='relu', padding='same', name="conv7", data_format=IMAGE_ORDERING))(o)
 
     # 4 times upsamping for pool4 layer
-    conv7_4 = Conv2DTranspose(n_classes, kernel_size=(4, 4), strides=(4, 4), use_bias=False,
-                              data_format=IMAGE_ORDERING)(
+    conv7_4 = Conv2DTranspose(n_classes, kernel_size=(4, 4), strides=(4, 4), use_bias=False, data_format=IMAGE_ORDERING)(
         conv7)
 
     # 2 times upsampling for pool411
     pool411 = (
-        Conv2D(n_classes, (1, 1), activation='relu', padding='same', name="pool4_11", data_format=IMAGE_ORDERING))(
-        pool4)
+        Conv2D(n_classes, (1, 1), activation='relu', padding='same', name="pool4_11", data_format=IMAGE_ORDERING))(pool4)
     pool411_2 = (
         Conv2DTranspose(n_classes, kernel_size=(2, 2), strides=(2, 2), use_bias=False, data_format=IMAGE_ORDERING))(
         pool411)
 
     pool311 = (
-        Conv2D(n_classes, (1, 1), activation='relu', padding='same', name="pool3_11", data_format=IMAGE_ORDERING))(
-        pool3)
+        Conv2D(n_classes, (1, 1), activation='relu', padding='same', name="pool3_11", data_format=IMAGE_ORDERING))(pool3)
 
     o = Add(name="add")([pool411_2, pool311, conv7_4])
     o = Conv2DTranspose(n_classes, kernel_size=(8, 8), strides=(8, 8), use_bias=False, data_format=IMAGE_ORDERING)(o)
     o = (Activation('softmax'))(o)
 
     model = Model(img_input, o)
-    model.summary()
-
-    sgd = SGD(lr=1E-2, decay=5 ** (-4), momentum=0.9, nesterov=True)
-    model.compile(loss='categorical_crossentropy',
-                  optimizer=sgd,
-                  metrics=['accuracy'])
 
     return model
