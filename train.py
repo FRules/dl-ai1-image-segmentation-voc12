@@ -5,7 +5,6 @@ from importlib import import_module
 from datetime import datetime
 
 import image_preprocessing
-
 import models.common
 from config import FILE_WITH_IMAGE_NAMES_FOR_TRAINING, FILE_WITH_IMAGE_NAMES_FOR_VALIDATION, N_CLASSES
 
@@ -22,7 +21,7 @@ def get_train_and_val_generator(batch_size, input_width=224, input_height=224):
     return train_generator, val_generator
 
 
-def train(model_name, epochs, batch_size, input_height, input_width):
+def train(model_name, epochs, batch_size, input_height, input_width, weights):
     train_generator, val_generator = get_train_and_val_generator(batch_size=batch_size,
                                                                  input_width=input_width,
                                                                  input_height=input_height)
@@ -34,13 +33,9 @@ def train(model_name, epochs, batch_size, input_height, input_width):
     print("Number of validation images:", no_of_val_images)
 
     model_module = import_module("models.{}.model".format(model_name))
-    model = model_module.get_model(n_classes=N_CLASSES, input_height=input_height, input_width=input_width)
 
-    history = model.fit_generator(generator=train_generator, epochs=epochs,
-                                  steps_per_epoch=(no_of_training_images // batch_size),
-                                  validation_data=val_generator,
-                                  validation_steps=(no_of_val_images // batch_size),
-                                  verbose=2)
+    model = model_module.get_model(n_classes=N_CLASSES, input_height=input_height, input_width=input_width,
+                                   weights=weights)
 
     now = datetime.now()
     dt_string = now.strftime("%m%d_%H%M%S")
@@ -53,8 +48,21 @@ def train(model_name, epochs, batch_size, input_height, input_width):
     if not os.path.isdir(res_dir):
         os.mkdir(res_dir)
 
+    history = model.fit_generator(generator=train_generator, epochs=epochs,
+                                  steps_per_epoch=(no_of_training_images // batch_size),
+                                  validation_data=val_generator,
+                                  validation_steps=(no_of_val_images // batch_size),
+                                  verbose=2)
+
     models.common.save(res_dir, model)
     models.common.plot_history(res_dir, history)
+
+
+def is_valid_file(parser, arg):
+    if not os.path.exists(arg):
+        parser.error("The file %s does not exist!" % arg)
+    else:
+        return open(arg, 'r')  # return an open file handle
 
 
 def main():
@@ -66,11 +74,12 @@ def main():
     parser.add_argument('--batch-size', default=16, type=int)
     parser.add_argument('--input-height', default=224, type=int)
     parser.add_argument('--input-width', default=224, type=int)
+    parser.add_argument('--weights', type=lambda x: is_valid_file(parser, x))
 
     args = parser.parse_args()
 
     train(model_name=args.model, epochs=args.epochs, batch_size=args.batch_size,
-          input_height=args.input_height, input_width=args.input_width)
+          input_height=args.input_height, input_width=args.input_width, weights=args.weights)
 
 
 if __name__ == "__main__":

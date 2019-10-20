@@ -1,6 +1,6 @@
-from keras.layers import *
-from keras import Model
-from keras.optimizers import *
+from keras import Model, Input
+from keras.layers import Conv2D, MaxPooling2D, Conv2DTranspose, Add, Activation
+from keras.optimizers import SGD
 
 
 def get_model(n_classes, input_height=224, input_width=224, weights=None):
@@ -45,10 +45,6 @@ def get_model(n_classes, input_height=224, input_width=224, weights=None):
     pool5 = MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool', data_format=IMAGE_ORDERING)(
         x)
 
-    vgg = Model(img_input, pool5)
-    if weights is not None:
-        vgg.load_weights(weights)  # loading VGG weights for the encoder parts of FCN8
-
     o = (Conv2D(4096, (7, 7), activation='relu', padding='same', name="conv6", data_format=IMAGE_ORDERING))(pool5)
     conv7 = (Conv2D(4096, (1, 1), activation='relu', padding='same', name="conv7", data_format=IMAGE_ORDERING))(o)
 
@@ -75,6 +71,9 @@ def get_model(n_classes, input_height=224, input_width=224, weights=None):
 
     model = Model(img_input, o)
     model.summary()
+
+    if weights is not None:
+        model.load_weights(weights.name, by_name=True)  # loading VGG weights for the encoder parts of FCN8
 
     sgd = SGD(lr=1E-2, decay=5 ** (-4), momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',

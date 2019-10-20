@@ -118,3 +118,4 @@ venv.bak/
 
 # Jupyter
 .ipynb_checkpoints/
+results/*

@@ -30,3 +30,5 @@
   * add dropout also after the upsampling layers
   * change dropout to 0.1
   * more filters than in __experiment_6__
+* __fcn8__:
+  * common architecture with pretrained weights based on vgg16
