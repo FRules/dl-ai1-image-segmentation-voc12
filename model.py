@@ -54,8 +54,7 @@ def get_model(embedding, input_height=224, input_width=224, weights=None):
         x)
 
     vgg = Model(img_input, pool5)
-    embeddings_path = get_embedding_path(embedding)
-    vgg.load_weights(embeddings_path)
+    vgg.load_weights(VGG16_WEIGHTS_IMAGE_NET_PATH)
     for layer in vgg.layers:
         layer.trainable = False
 
