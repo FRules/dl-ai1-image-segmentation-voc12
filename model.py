@@ -116,7 +116,7 @@ def save(model, history, name):
 
 
 def visualize_model(model, name):
-    plot_model(model, to_file=name + '.png')
+    plot_model(model, to_file=name + '.png', show_shapes=True)
 
 
 def plot_history(history, filename):
