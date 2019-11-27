@@ -4,6 +4,7 @@ from keras.optimizers import *
 from datetime import datetime
 import matplotlib
 import os
+from keras.utils import plot_model
 from config import VGG16_WEIGHTS_CIFAR_100_PATH, VGG16_WEIGHTS_CIFAR_10_PATH, VGG16_WEIGHTS_IMAGE_NET_PATH
 from config import IMAGE_ORDERING, RESULTS_FOLDER, N_CLASSES
 
@@ -113,6 +114,10 @@ def save(model, history, name):
     # serialize weights to HDF5
     model.save_weights(filename + ".h5", overwrite=True)
     plot_history(history, filename)
+
+
+def visualize_model(model, name):
+    plot_model(model, to_file=name + '.png')
 
 
 def plot_history(history, filename):

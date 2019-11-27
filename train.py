@@ -30,6 +30,7 @@ def train(name, embedding, epochs, batch_size, input_height, input_width, weight
     print("Number of validation images:", no_of_val_images)
 
     model = mo.get_model(embedding, input_height=input_height, input_width=input_width, weights=weights)
+    # mo.visualize_model(model, name)
 
     history = model.fit_generator(generator=train_generator, epochs=epochs,
                                   steps_per_epoch=(no_of_training_images // batch_size),
