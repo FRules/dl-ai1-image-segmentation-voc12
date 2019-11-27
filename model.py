@@ -4,14 +4,14 @@ from keras.optimizers import *
 from datetime import datetime
 import matplotlib
 import os
-from config import VGG16_WEIGHTS_PATH, IMAGE_ORDERING, RESULTS_FOLDER
+from config import VGG16_WEIGHTS_CIFAR_100_PATH, VGG16_WEIGHTS_CIFAR_10_PATH, VGG16_WEIGHTS_IMAGE_NET_PATH
+from config import IMAGE_ORDERING, RESULTS_FOLDER, N_CLASSES
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
-
-def get_model(n_classes, input_height=224, input_width=224):
+def get_model(embedding, input_height=224, input_width=224, weights=None):
     # input_height and width must be dividable by 32 because maxpooling
     # with filter size = (2,2) is operated 5 times,
     # which makes the input_height and width 2^5 = 32 times smaller
@@ -53,7 +53,8 @@ def get_model(n_classes, input_height=224, input_width=224):
         x)
 
     vgg = Model(img_input, pool5)
-    vgg.load_weights(VGG16_WEIGHTS_PATH)
+    embeddings_path = get_embedding_path(embedding)
+    vgg.load_weights(embeddings_path)
     for layer in vgg.layers:
         layer.trainable = False
 
@@ -61,33 +62,46 @@ def get_model(n_classes, input_height=224, input_width=224):
     conv7 = (Conv2D(4096, (1, 1), activation='relu', padding='same', name="conv7", data_format=IMAGE_ORDERING))(o)
 
     # 4 times upsamping for pool4 layer
-    conv7_4 = Conv2DTranspose(n_classes, kernel_size=(4, 4), strides=(4, 4), use_bias=False,
+    conv7_4 = Conv2DTranspose(N_CLASSES, kernel_size=(4, 4), strides=(4, 4), use_bias=False,
                               data_format=IMAGE_ORDERING)(
         conv7)
 
     # 2 times upsampling for pool411
     pool411 = (
-        Conv2D(n_classes, (1, 1), activation='relu', padding='same', name="pool4_11", data_format=IMAGE_ORDERING))(
+        Conv2D(N_CLASSES, (1, 1), activation='relu', padding='same', name="pool4_11", data_format=IMAGE_ORDERING))(
         pool4)
     pool411_2 = (
-        Conv2DTranspose(n_classes, kernel_size=(2, 2), strides=(2, 2), use_bias=False, data_format=IMAGE_ORDERING))(
+        Conv2DTranspose(N_CLASSES, kernel_size=(2, 2), strides=(2, 2), use_bias=False, data_format=IMAGE_ORDERING))(
         pool411)
 
     pool311 = (
-        Conv2D(n_classes, (1, 1), activation='relu', padding='same', name="pool3_11", data_format=IMAGE_ORDERING))(
+        Conv2D(N_CLASSES, (1, 1), activation='relu', padding='same', name="pool3_11", data_format=IMAGE_ORDERING))(
         pool3)
 
     o = Add(name="add")([pool411_2, pool311, conv7_4])
-    o = Conv2DTranspose(n_classes, kernel_size=(8, 8), strides=(8, 8), use_bias=False, data_format=IMAGE_ORDERING)(o)
+    o = Conv2DTranspose(N_CLASSES, kernel_size=(8, 8), strides=(8, 8), use_bias=False, data_format=IMAGE_ORDERING)(o)
     o = (Activation('softmax'))(o)
 
     model = Model(img_input, o)
+    if weights is not None:
+        model.load_weights(weights.name, by_name=True)
+
     model.summary()
 
     opt = Adam(lr=1E-5, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
     return model
+
+
+def get_embedding_path(embedding):
+    if embedding == "imagenet":
+        return VGG16_WEIGHTS_IMAGE_NET_PATH
+    elif embedding == "cifar10":
+        return VGG16_WEIGHTS_CIFAR_10_PATH
+    elif embedding == "cifar100":
+        return VGG16_WEIGHTS_CIFAR_100_PATH
+    return None
 
 
 def save(model, history, name):

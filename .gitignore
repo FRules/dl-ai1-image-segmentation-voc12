@@ -1,6 +1,7 @@
 # dataset
 VOCdevkit Testing/
 VOCdevkit Training/
+pretrained_vgg_weights/
 
 # pycharm files
 .idea/
