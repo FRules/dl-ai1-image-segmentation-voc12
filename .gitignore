@@ -2,6 +2,8 @@
 VOCdevkit Testing/
 VOCdevkit Training/
 pretrained_vgg_weights/
+old_results/
+results/
 
 # pycharm files
 .idea/
