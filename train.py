@@ -1,30 +1,21 @@
 import argparse
 import glob
 import os
+import sys
 from importlib import import_module
 from datetime import datetime
+
+from keras import utils
+from keras.callbacks import ModelCheckpoint
 
 import image_preprocessing
 import models.common
 from config import FILE_WITH_IMAGE_NAMES_FOR_TRAINING, FILE_WITH_IMAGE_NAMES_FOR_VALIDATION, N_CLASSES
+from tensorboard_callback import MyTensorBoardCallback
 
 
-def get_train_and_val_generator(batch_size, input_width=224, input_height=224):
-    train_generator = image_preprocessing.get_image_generator(
-        file_with_image_names=FILE_WITH_IMAGE_NAMES_FOR_TRAINING,
-        batch_size=batch_size,
-        input_width=input_width)
-    val_generator = image_preprocessing.get_image_generator(
-        file_with_image_names=FILE_WITH_IMAGE_NAMES_FOR_VALIDATION,
-        batch_size=batch_size,
-        input_height=input_height)
-    return train_generator, val_generator
-
-
-def train(model_name, epochs, batch_size, input_height, input_width, weights):
-    train_generator, val_generator = get_train_and_val_generator(batch_size=batch_size,
-                                                                 input_width=input_width,
-                                                                 input_height=input_height)
+def train(args):
+    model_name, epochs, batch_size, weights, dataset_dir = args.model, args.epochs, args.batch_size, args.weights, args.dataset_dir
 
     no_of_training_images = len(open(FILE_WITH_IMAGE_NAMES_FOR_TRAINING, "r").readlines())
     no_of_val_images = len(open(FILE_WITH_IMAGE_NAMES_FOR_VALIDATION, "r").readlines())
@@ -34,8 +25,7 @@ def train(model_name, epochs, batch_size, input_height, input_width, weights):
 
     model_module = import_module("models.{}.model".format(model_name))
 
-    model = model_module.get_model(n_classes=N_CLASSES, input_height=input_height, input_width=input_width,
-                                   weights=weights)
+    model = model_module.get_model(n_classes=N_CLASSES, weights=weights)
 
     now = datetime.now()
     dt_string = now.strftime("%m%d_%H%M%S")
@@ -48,11 +38,29 @@ def train(model_name, epochs, batch_size, input_height, input_width, weights):
     if not os.path.isdir(res_dir):
         os.mkdir(res_dir)
 
-    history = model.fit_generator(generator=train_generator, epochs=epochs,
-                                  steps_per_epoch=(no_of_training_images // batch_size),
-                                  validation_data=val_generator,
-                                  validation_steps=(no_of_val_images // batch_size),
-                                  verbose=2)
+    if 'pydot' in sys.modules and 'graphviz' in sys.modules:
+        utils.plot_model(model, to_file=os.path.join(res_dir, 'model.png'), show_shapes=True)
+
+    history = model.fit_generator(generator=image_preprocessing.PascalVOCSequence(FILE_WITH_IMAGE_NAMES_FOR_TRAINING,
+                                                                                  batch_size, dataset_dir),
+                                  epochs=epochs,
+                                  steps_per_epoch=int(no_of_training_images // float(batch_size)),
+                                  validation_data=image_preprocessing.PascalVOCSequence(FILE_WITH_IMAGE_NAMES_FOR_VALIDATION,
+                                                                                        batch_size, dataset_dir),
+                                  validation_steps=int(no_of_val_images // float(batch_size)),
+                                  verbose=1,
+                                  callbacks=[
+                                      ModelCheckpoint(os.path.join(res_dir, "weights.hdf5"),
+                                                      save_best_only=True, verbose=1, save_weights_only=True, period=1,
+                                                      monitor='val_acc'),
+                                      # ReduceLROnPlateau(patience=2, factor=0.5, verbose=1, epsilon=1e-3,  monitor='val_acc'),
+                                      MyTensorBoardCallback(args, res_dir, write_graph=False)
+                                  ],
+                                  use_multiprocessing=True,
+                                  workers=8,
+                                  max_queue_size=1,
+                                  shuffle=True
+                                  )
 
     models.common.save(res_dir, model)
     models.common.plot_history(res_dir, history)
@@ -70,16 +78,13 @@ def main():
 
     available_models = [model_name.split("/")[1] for model_name in glob.glob("models/*/model.py")]
     parser.add_argument('model', choices=available_models)
-    parser.add_argument('--epochs', default=25, type=int)
+    parser.add_argument('--epochs', default=50, type=int)
     parser.add_argument('--batch-size', default=16, type=int)
-    parser.add_argument('--input-height', default=224, type=int)
-    parser.add_argument('--input-width', default=224, type=int)
+    parser.add_argument('--dataset-dir', type=str, default='.')
     parser.add_argument('--weights', type=lambda x: is_valid_file(parser, x))
 
     args = parser.parse_args()
-
-    train(model_name=args.model, epochs=args.epochs, batch_size=args.batch_size,
-          input_height=args.input_height, input_width=args.input_width, weights=args.weights)
+    train(args)
 
 
 if __name__ == "__main__":

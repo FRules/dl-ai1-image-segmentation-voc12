@@ -116,6 +116,9 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+# macosx
+**/.DS_Store
+
 # Jupyter
 .ipynb_checkpoints/
 results/*

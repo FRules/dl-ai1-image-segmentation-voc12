@@ -1,83 +1,61 @@
+import sys
+
 from keras import Model, Input
-from keras.layers import Conv2D, MaxPooling2D, Conv2DTranspose, Add, Activation
-from keras.optimizers import SGD
+from keras.applications import VGG16
+from keras.layers import Conv2D, Conv2DTranspose, Add, Activation
+from keras.optimizers import Adam
 
 
 def get_model(n_classes, input_height=224, input_width=224, weights=None):
-    # input_height and width must be dividable by 32 because maxpooling
-    # with filter size = (2,2) is operated 5 times,
-    # which makes the input_height and width 2^5 = 32 times smaller
     assert input_height % 32 == 0
     assert input_width % 32 == 0
-    IMAGE_ORDERING = "channels_last"
 
-    img_input = Input(shape=(input_height, input_width, 3))  # Assume 224,224,3
+    img_input = Input(shape=(input_height, input_width, 3))
 
-    # Block 1
-    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1', data_format=IMAGE_ORDERING)(
-        img_input)
-    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2', data_format=IMAGE_ORDERING)(x)
-    x = MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool', data_format=IMAGE_ORDERING)(x)
+    # Encoder - Load VGG16
+    encoder = VGG16(weights='imagenet', input_tensor=img_input, include_top=False, pooling=None)
 
-    # Block 2
-    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1', data_format=IMAGE_ORDERING)(x)
-    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv2', data_format=IMAGE_ORDERING)(x)
-    x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool', data_format=IMAGE_ORDERING)(x)
+    # Encoder -  Freeze layers
+    for layer in encoder.layers:
+        if "block" in layer.name:
+            layer.trainable = False
 
-    # Block 3
-    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv1', data_format=IMAGE_ORDERING)(x)
-    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv2', data_format=IMAGE_ORDERING)(x)
-    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv3', data_format=IMAGE_ORDERING)(x)
-    x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool', data_format=IMAGE_ORDERING)(x)
-    pool3 = x
+    # Encoder -  Get intermediate VGG16 layers output
+    pool3 = encoder.get_layer('block3_pool').output
+    pool4 = encoder.get_layer('block4_pool').output
+    pool5 = encoder.get_layer('block5_pool').output
 
-    # Block 4
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1', data_format=IMAGE_ORDERING)(x)
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2', data_format=IMAGE_ORDERING)(x)
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3', data_format=IMAGE_ORDERING)(x)
-    pool4 = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool', data_format=IMAGE_ORDERING)(
-        x)
+    # Encoder - add two convolution layers
+    conv6 = (Conv2D(filters=512, kernel_size=(7, 7), activation='relu', padding='same', name='block6_conv1'))(pool5)
+    conv7 = (Conv2D(filters=512, kernel_size=(1, 1), activation='relu', padding='same', name='block7_conv1'))(conv6)
 
-    # Block 5
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv1', data_format=IMAGE_ORDERING)(pool4)
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv2', data_format=IMAGE_ORDERING)(x)
-    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv3', data_format=IMAGE_ORDERING)(x)
-    pool5 = MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool', data_format=IMAGE_ORDERING)(
-        x)
+    # Decoder - fcn32 - not used, but written for the learning purpose
+    # conv8 = Conv2D(filters=n_classes, kernel_size=(1, 1), activation='relu', padding='same', name='block8_conv1')(conv7)
+    # fcn32 = Conv2DTranspose(n_classes, kernel_size=(1, 1), strides=(32, 32), padding='valid', name='block8_deconv1)(conv8)
 
-    o = (Conv2D(4096, (7, 7), activation='relu', padding='same', name="conv6", data_format=IMAGE_ORDERING))(pool5)
-    conv7 = (Conv2D(4096, (1, 1), activation='relu', padding='same', name="conv7", data_format=IMAGE_ORDERING))(o)
+    # Decoder - fcn16 - not used, but written for the learning purpose
+    # conv9 = Conv2D(filters=n_classes, kernel_size=(1, 1), activation='relu', padding='same', name='block9_conv1')(pool4)
+    # deconv1 = Conv2DTranspose(filters=n_classes, kernel_size=(1, 1), strides=(2, 2), activation='relu', padding='same', name='block9_deconv1')(conv7)
+    # add1 = Add(name='block9_add1')([conv9, deconv1])
+    # fcn16 = Conv2DTranspose(n_classes, kernel_size=(1, 1), strides=(16, 16), padding='valid', name='block9_deconv2')(add1)
 
-    # 4 times upsamping for pool4 layer
-    conv7_4 = Conv2DTranspose(n_classes, kernel_size=(4, 4), strides=(4, 4), use_bias=False,
-                              data_format=IMAGE_ORDERING)(
-        conv7)
+    # Decoder - fcn32
+    conv10 = Conv2D(filters=n_classes, kernel_size=(1, 1), activation='relu', padding='same', name='block10_conv1')(pool3)
+    conv11 = Conv2D(filters=n_classes, kernel_size=(1, 1), activation='relu', padding='same', name='block10_conv2')(pool4)
+    deconv2 = Conv2DTranspose(filters=n_classes, kernel_size=(1, 1), strides=(2, 2), activation='relu', padding='same', name='block10_deconv1', use_bias=False)(conv11)
+    deconv3 = Conv2DTranspose(filters=n_classes, kernel_size=(1, 1), strides=(4, 4), activation='relu', padding='same', name='block10_deconv2', use_bias=False)(conv7)
+    add2 = Add(name='block10_add2')([conv10, deconv2, deconv3])
+    fcn32 = Conv2DTranspose(n_classes, kernel_size=(1, 1), strides=(8, 8), padding='valid', name='block10_deconv3', use_bias=False)(add2)
 
-    # 2 times upsampling for pool411
-    pool411 = (
-        Conv2D(n_classes, (1, 1), activation='relu', padding='same', name="pool4_11", data_format=IMAGE_ORDERING))(
-        pool4)
-    pool411_2 = (
-        Conv2DTranspose(n_classes, kernel_size=(2, 2), strides=(2, 2), use_bias=False, data_format=IMAGE_ORDERING))(
-        pool411)
+    output = Activation('softmax')(fcn32)
 
-    pool311 = (
-        Conv2D(n_classes, (1, 1), activation='relu', padding='same', name="pool3_11", data_format=IMAGE_ORDERING))(
-        pool3)
-
-    o = Add(name="add")([pool411_2, pool311, conv7_4])
-    o = Conv2DTranspose(n_classes, kernel_size=(8, 8), strides=(8, 8), use_bias=False, data_format=IMAGE_ORDERING)(o)
-    o = (Activation('softmax'))(o)
-
-    model = Model(img_input, o)
-    model.summary()
+    model = Model(img_input, output)
 
     if weights is not None:
         model.load_weights(weights.name, by_name=True)  # loading VGG weights for the encoder parts of FCN8
 
-    sgd = SGD(lr=1E-2, decay=5 ** (-4), momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
-                  optimizer=sgd,
+                  optimizer=Adam(lr=5 * 10 ** -5),
                   metrics=['accuracy'])
 
     return model

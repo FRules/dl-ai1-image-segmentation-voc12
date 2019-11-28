@@ -25,9 +25,6 @@ def save(res_dir, model):
     with open(os.path.join(res_dir, "model.json"), "w") as json_file:
         json_file.write(model_json)
 
-    # serialize weights to HDF5
-    model.save_weights(os.path.join(res_dir, "model.h5"))
-
 
 def plot_history(res_dir, history):
     # Accuracy plot

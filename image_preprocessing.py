@@ -2,7 +2,9 @@ import os
 
 import numpy as np
 from PIL import Image
+from keras.applications.imagenet_utils import preprocess_input
 from keras.preprocessing.image import img_to_array
+from keras.utils import Sequence
 
 from config import SRC_DIR_TRAINING_X, FILE_TYPE_TRAINING_X, SRC_DIR_TRAINING_Y, FILE_TYPE_TRAINING_Y, N_CLASSES
 
@@ -25,7 +27,7 @@ def get_input(path, file_name, input_width, input_height):
     image_name = file_name.strip()  # remove whitespaces
     with Image.open(os.path.join(path, image_name + FILE_TYPE_TRAINING_X)) as x_image:
         x_image = x_image.resize((input_width, input_height))
-        return img_to_array(x_image)
+    return preprocess_input(img_to_array(x_image))
 
 
 def get_output(path, file_name, input_width, input_height):
@@ -34,26 +36,23 @@ def get_output(path, file_name, input_width, input_height):
         y_image = y_image.resize((input_width, input_height))
         y_image = remove_color_map(y_image)
         y_image = get_segmentation_array(y_image)
-        return y_image
+    return y_image
 
 
-def get_image_generator(file_with_image_names, batch_size=64, input_width=224, input_height=224):
-    files = open(file_with_image_names, "r").readlines()
-    while True:
-        # Select files (paths/indices) for the batch
-        batch_paths = np.random.choice(a=files, size=batch_size)
-        batch_input = []
-        batch_output = []
+class PascalVOCSequence(Sequence):
 
-        # Read in each input, perform preprocessing and get labels
-        for file_name in batch_paths:
-            input = get_input(SRC_DIR_TRAINING_X, file_name, input_width, input_height)
-            output = get_output(SRC_DIR_TRAINING_Y, file_name, input_width, input_height)
+    def __init__(self, file_with_image_names, batch_size=64, dataset_dir=None):
+        self.batch_size = batch_size
+        with open(file_with_image_names, "r") as f:
+            self.files = [line.strip() for line in f]
+        self.dataset_dir = dataset_dir
 
-            batch_input += [input]
-            batch_output += [output]
-        # Return a tuple of (input,output) to feed the network
-        batch_x = np.array(batch_input)
-        batch_y = np.array(batch_output)
+    def __len__(self):
+        return int(len(self.files) // self.batch_size)
 
-        yield (batch_x, batch_y)
+    def __getitem__(self, idx):
+        batch_files = self.files[idx * self.batch_size:(idx + 1) * self.batch_size]
+        batch = [(get_input(os.path.join(self.dataset_dir, SRC_DIR_TRAINING_X), file_name, 224, 224),
+                  get_output(os.path.join(self.dataset_dir, SRC_DIR_TRAINING_Y), file_name, 224, 224)) for file_name in batch_files]
+        batch_x, batch_y = list(zip(*batch))
+        return np.array(batch_x), np.array(batch_y)
