@@ -58,8 +58,7 @@ def train(args):
                                   ],
                                   use_multiprocessing=True,
                                   workers=8,
-                                  max_queue_size=1,
-                                  shuffle=True
+                                  max_queue_size=1
                                   )
 
     models.common.save(res_dir, model)

@@ -13,8 +13,7 @@ def get_model(n_classes, input_height=224, input_width=224, weights=None):
     img_input = Input(shape=(input_height, input_width, 3))
 
     # Encoder - Load VGG16
-    encoder = VGG16(weights=None, input_tensor=img_input, include_top=False, pooling=None)
-    encoder.load_weights("models/fcn8/vgg16_weights.h5", by_name=True)
+    encoder = VGG16(weights='imagenet', input_tensor=img_input, include_top=False, pooling=None)
 
     # Encoder -  Freeze layers
     for layer in encoder.layers:
@@ -27,8 +26,8 @@ def get_model(n_classes, input_height=224, input_width=224, weights=None):
     pool5 = encoder.get_layer('block5_pool').output
 
     # Encoder - add two convolution layers
-    conv6 = (Conv2D(filters=512, kernel_size=(7, 7), activation='relu', padding='same', name='block6_conv1'))(pool5)
-    conv7 = (Conv2D(filters=512, kernel_size=(1, 1), activation='relu', padding='same', name='block7_conv1'))(conv6)
+    conv6 = (Conv2D(filters=4096, kernel_size=(7, 7), activation='relu', padding='same', name='block6_conv1'))(pool5)
+    conv7 = (Conv2D(filters=4096, kernel_size=(1, 1), activation='relu', padding='same', name='block7_conv1'))(conv6)
 
     # Decoder - fcn32 - not used, but written for the learning purpose
     # conv8 = Conv2D(filters=n_classes, kernel_size=(1, 1), activation='relu', padding='same', name='block8_conv1')(conv7)
