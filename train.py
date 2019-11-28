@@ -6,7 +6,7 @@ from importlib import import_module
 from datetime import datetime
 
 from keras import utils
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 
 import image_preprocessing
 import models.common
@@ -53,7 +53,7 @@ def train(args):
                                       ModelCheckpoint(os.path.join(res_dir, "weights.hdf5"),
                                                       save_best_only=True, verbose=1, save_weights_only=True, period=1,
                                                       monitor='val_acc'),
-                                      # ReduceLROnPlateau(patience=2, factor=0.5, verbose=1, epsilon=1e-3,  monitor='val_acc'),
+                                      ReduceLROnPlateau(patience=3, factor=0.1, verbose=1, epsilon=1e-3,  monitor='loss'),
                                       MyTensorBoardCallback(args, res_dir, write_graph=False)
                                   ],
                                   use_multiprocessing=True,

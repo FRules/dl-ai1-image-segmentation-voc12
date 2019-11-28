@@ -13,7 +13,8 @@ def get_model(n_classes, input_height=224, input_width=224, weights=None):
     img_input = Input(shape=(input_height, input_width, 3))
 
     # Encoder - Load VGG16
-    encoder = VGG16(weights='imagenet', input_tensor=img_input, include_top=False, pooling=None)
+    encoder = VGG16(weights=None, input_tensor=img_input, include_top=False, pooling=None)
+    encoder.load_weights("models/fcn8/vgg16_weights.h5", by_name=True)
 
     # Encoder -  Freeze layers
     for layer in encoder.layers:
@@ -55,7 +56,7 @@ def get_model(n_classes, input_height=224, input_width=224, weights=None):
         model.load_weights(weights.name, by_name=True)  # loading VGG weights for the encoder parts of FCN8
 
     model.compile(loss='categorical_crossentropy',
-                  optimizer=Adam(lr=5 * 10 ** -5),
+                  optimizer=Adam(lr=1E-2),
                   metrics=['accuracy'])
 
     return model
